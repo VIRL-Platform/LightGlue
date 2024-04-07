@@ -8,6 +8,8 @@
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects
+from matplotlib.animation import FuncAnimation
+from matplotlib.collections import PatchCollection
 import numpy as np
 import torch
 
@@ -98,7 +100,7 @@ def plot_keypoints(kpts, colors='lime', ps=4, axes=None, a=1.0):
 
 
 def plot_matches(kpts0, kpts1, color=None, lw=1.5, ps=4, a=1., labels=None,
-                 axes=None):
+                 axes=None, progress=None):
     """Plot matches for a pair of existing images.
     Args:
         kpts0, kpts1: corresponding keypoints of size (N, 2).
@@ -107,6 +109,7 @@ def plot_matches(kpts0, kpts1, color=None, lw=1.5, ps=4, a=1., labels=None,
         ps: size of the end points (no endpoint if ps=0)
         indices: indices of the images to draw the matches on.
         a: alpha opacity of the match lines.
+        progress: float between 0 and 1, to interpolate between the middle point of the line.
     """
     fig = plt.gcf()
     if axes is None:
@@ -126,14 +129,23 @@ def plot_matches(kpts0, kpts1, color=None, lw=1.5, ps=4, a=1., labels=None,
 
     if lw > 0:
         for i in range(len(kpts0)):
+            if progress is not None:
+                p0 = ax0.transData.transform((kpts0[i, 0], kpts0[i, 1]))
+                p1 = ax1.transData.transform((kpts1[i, 0], kpts1[i, 1]))
+                p_intermediate = (1 - progress) * np.array(p0) + progress * np.array(p1)
+                end_x, end_y = ax1.transData.inverted().transform(p_intermediate)
+            else:
+                end_x = kpts1[i, 0]
+                end_y = kpts1[i, 1]
+
             line = matplotlib.patches.ConnectionPatch(
-                xyA=(kpts0[i, 0], kpts0[i, 1]), xyB=(kpts1[i, 0], kpts1[i, 1]),
+                xyA=(kpts0[i, 0], kpts0[i, 1]), xyB=(end_x, end_y),
                 coordsA=ax0.transData, coordsB=ax1.transData,
                 axesA=ax0, axesB=ax1,
                 zorder=1, color=color[i], linewidth=lw, clip_on=True,
                 alpha=a, label=None if labels is None else labels[i],
                 picker=5.0)
-            line.set_annotation_clip(True)
+            line.set_annotation_clip(False)
             fig.add_artist(line)
 
     # freeze the axes to prevent the transform to change
@@ -156,6 +168,8 @@ def add_text(idx, text, pos=(0.01, 0.99), fs=15, color='w',
             path_effects.Normal()])
 
 
-def save_plot(path, **kw):
+def save_plot(path, clear=False, **kw):
     """Save the current figure without any white margin."""
     plt.savefig(path, bbox_inches='tight', pad_inches=0, **kw)
+    if clear:
+        plt.clf()

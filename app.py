@@ -28,11 +28,12 @@ def numpy_image_to_torch(image: np.ndarray) -> torch.Tensor:
 
 
 class LightGlueWrapper(object):
-
     def __init__(self) -> None:
         # SuperPoint+LightGlue
         self.extractor = SuperPoint(max_num_keypoints=2048).eval().cuda()  # load the extractor
         self.matcher = LightGlue(features='superpoint').eval().cuda()  # load the matcher
+        # self.extractor = SuperPoint(max_num_keypoints=4096).eval().cuda()  # load the extractor
+        # self.matcher = LightGlue(features='superpoint', depth_confidence=0.99, width_confidence=0.99).eval().cuda()  # load the matcher
 
         # logging.basicConfig(level=logging.DEBUG)
 
@@ -49,9 +50,6 @@ class LightGlueWrapper(object):
         return numpy_image_to_torch(image)
 
     def predict(self, image0, image1):
-        # logger = logging.getLogger('predict')
-        # logger.debug(f"image0: {image0}")
-        # logger.debug(f"image1: {image1}")
         with torch.no_grad():
             image0 = self.load(image0).cuda()
             image1 = self.load(image1).cuda()
@@ -65,21 +63,9 @@ class LightGlueWrapper(object):
             
         feats0, feats1, matches01 = [rbd(x) for x in [feats0, feats1, matches01]]  # remove batch dimension
         matches = matches01['matches']  # indices with shape (K,2)
-        # points0 = feats0['keypoints'][matches[..., 0]]  # coordinates in image #0, shape (K,2)
-        # points1 = feats1['keypoints'][matches[..., 1]]  # coordinates in image #1, shape (K,2)
 
         kpts0, kpts1, matches = feats0['keypoints'], feats1['keypoints'], matches01['matches']
         m_kpts0, m_kpts1 = kpts0[matches[..., 0]], kpts1[matches[..., 1]]
-        # axes = viz2d.plot_images([image0, image1])
-        # viz2d.plot_matches(m_kpts0, m_kpts1, color='lime', lw=0.2)
-        # viz2d.add_text(0, f'Stop after {matches01["stop"]} layers' + '\nMatches: {}'.format(len(m_kpts0)) + '\nConf: {}'.format(matches01['scores'].mean()), fs=10)
-
-        # # kpc0, kpc1 = viz2d.cm_prune(matches01['prune0']), viz2d.cm_prune(matches01['prune1'])
-        # # viz2d.plot_images([image0, image1])
-        # # viz2d.plot_keypoints([kpts0, kpts1], colors=[kpc0, kpc1], ps=10)
-        # viz2d.save_plot('temp2.png')
-
-        # thresh = 100
 
         torch.cuda.empty_cache()
         return len(m_kpts0)
